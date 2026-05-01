@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wumpus World</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;600;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   RETRO-TERMINAL / NEON NOIR DESIGN SYSTEM
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --void:    #04060a;
+  --dark:    #080c12;
+  --panel:   #0a0e18;
+  --panel2:  #0d1220;
+  --rim:     #111828;
+
+  --cyan:    #00e5ff;
+  --cyan2:   #0098aa;
+  --cyan-g:  rgba(0,229,255,0.18);
+  --teal:    #00ffcc;
+  --teal2:   #00aa88;
+
+  --amber:   #ffb300;
+  --amber2:  #cc8800;
+  --amber-g: rgba(255,179,0,0.18);
+
+  --magenta: #ff2d78;
+  --mag2:    #aa1050;
+  --mag-g:   rgba(255,45,120,0.18);
+
+  --lime:    #b8ff00;
+  --lime2:   #7aaa00;
+  --lime-g:  rgba(184,255,0,0.15);
+
+  --red:     #ff2222;
+  --red2:    #aa0808;
+  --red-g:   rgba(255,34,34,0.18);
+
+  --txt:     #c8e8f0;
+  --txt2:    #5a8898;
+  --txt3:    #2a4050;
+
+  --bdr:     rgba(0,229,255,0.12);
+  --bdr2:    rgba(0,229,255,0.28);
+  --bdr3:    rgba(0,229,255,0.5);
+
+  --ff-head: 'Orbitron', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-crt:  'VT323', monospace;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--void);
+  color: var(--txt);
+  font-family: var(--ff-mono);
+  font-size: 13px;
+  overflow-x: hidden;
+}
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+  );
+  animation: scan 8s linear infinite;
+}
+@keyframes scan {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 400px; }
+}
+
+/* Ambient glow */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 15%, rgba(0,229,255,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 50% at 80% 80%, rgba(255,45,120,0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(0,255,204,0.03) 0%, transparent 80%);
+}
+
+/* Grid noise texture */
+.noise {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ═══════════════════ APP ═══════════════════ */
+#app {
+  position: relative; z-index: 1;
+  max-width: 1440px; margin: 0 auto;
+  padding: 1rem 1.2rem 3rem;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ═══════════════════ HEADER ═══════════════════ */
+.hdr {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  padding: 16px 28px;
+  background: var(--panel2);
+  border: 1px solid var(--bdr2);
+  border-top: 2px solid var(--cyan);
+  border-radius: 4px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 0 40px rgba(0,229,255,0.08), inset 0 1px 0 rgba(0,229,255,0.1);
+}
+.hdr::before {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(135deg, rgba(0,229,255,0.04) 0%, transparent 60%);
+}
+
+.hdr-left { display: flex; align-items: center; gap: 18px; }
+.hdr-glyph {
+  font-size: 38px; line-height: 1;
+  filter: drop-shadow(0 0 12px var(--cyan));
+}
+.hdr-text h1 {
+  font-family: var(--ff-head);
+  font-size: 20px; font-weight: 900; letter-spacing: .14em;
+  color: var(--cyan);
+  text-shadow: 0 0 20px var(--cyan), 0 0 40px rgba(0,229,255,0.4);
+  line-height: 1.1;
+}
+.hdr-text .sub {
+  font-family: var(--ff-mono); font-size: 9px; color: var(--txt2);
+  letter-spacing: .12em; text-transform: uppercase; margin-top: 3px;
+}
+
+.hdr-right { display: flex; align-items: center; gap: 8px; }
+.pill {
+  font-family: var(--ff-mono); font-size: 8px;
+  padding: 4px 12px; border-radius: 2px; border: 1px solid;
+  letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+}
+.pill-online { border-color: var(--lime2); color: var(--lime); background: var(--lime-g); animation: blink-pill 2s ease-in-out infinite; }
+.pill-wump   { border-color: var(--amber2); color: var(--amber); background: var(--amber-g); }
+@keyframes blink-pill { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* ═══════════════════ CONTROLS ═══════════════════ */
+.ctrl {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 20px;
+  background: rgba(8,12,18,0.95);
+  border: 1px solid var(--bdr); border-radius: 4px;
+}
+.ctrl-lbl { font-size: 8px; color: var(--txt3); letter-spacing: .14em; text-transform: uppercase; }
+.ctrl-grp { display: flex; align-items: center; gap: 6px; }
+.ctrl-grp label { font-size: 9px; color: var(--txt2); letter-spacing: .1em; text-transform: uppercase; }
+.ctrl-grp input[type=number] {
+  width: 52px; font-family: var(--ff-mono); font-size: 13px; padding: 5px 8px;
+  border-radius: 2px; border: 1px solid var(--bdr2);
+  background: rgba(0,229,255,0.04); color: var(--cyan); outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.ctrl-grp input:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(0,229,255,0.25); }
+.vdiv { width: 1px; height: 26px; background: var(--bdr); flex-shrink: 0; }
+
+.btn {
+  font-family: var(--ff-head); font-size: 8px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  padding: 8px 18px; border-radius: 3px; border: 1px solid;
+  cursor: pointer; transition: all .15s; position: relative; overflow: hidden;
+}
+.btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 60%);
+}
+.btn:active { transform: scale(0.95); }
+
+.btn-new  { border-color: var(--teal2);  color: var(--teal);  background: rgba(0,255,204,0.06); }
+.btn-new:hover  { box-shadow: 0 0 20px rgba(0,255,204,0.3); background: rgba(0,255,204,0.12); }
+.btn-step { border-color: var(--lime2);  color: var(--lime);  background: var(--lime-g); }
+.btn-step:hover { box-shadow: 0 0 20px rgba(184,255,0,0.3);  background: rgba(184,255,0,0.12); }
+.btn-auto { border-color: var(--cyan2);  color: var(--cyan);  background: var(--cyan-g); }
+.btn-auto:hover { box-shadow: 0 0 20px rgba(0,229,255,0.3);  background: rgba(0,229,255,0.12); }
+.btn-auto.running { border-color: var(--magenta); color: var(--magenta); background: var(--mag-g); animation: run-throb 1s ease-in-out infinite; }
+@keyframes run-throb { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* ═══════════════════ STATUS ═══════════════════ */
+#status-bar {
+  display: flex; align-items: center; gap: 10px; padding: 7px 16px;
+  background: rgba(4,6,10,0.95); border: 1px solid var(--bdr); border-radius: 3px;
+  font-family: var(--ff-crt); font-size: 16px; letter-spacing: .04em;
+}
+.status-cursor { color: var(--cyan); animation: cursor-blink 1s step-end infinite; }
+@keyframes cursor-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+#status-text { color: var(--teal); flex: 1; }
+
+/* ═══════════════════ LAYOUT ═══════════════════ */
+.content {
+  display: grid; grid-template-columns: 1fr 300px; gap: 12px; align-items: start;
+}
+@media(max-width: 860px) { .content { grid-template-columns: 1fr; } }
+
+/* ═══════════════════ MAP PANEL ═══════════════════ */
+.map-panel {
+  background: var(--panel);
+  border: 1px solid var(--bdr2); border-radius: 6px;
+  padding: 18px; position: relative; overflow: hidden;
+}
+.map-panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan2), var(--cyan), var(--teal), var(--cyan2), transparent);
+}
+.map-title {
+  font-family: var(--ff-head); font-size: 8px; color: var(--txt2);
+  letter-spacing: .18em; text-transform: uppercase; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.map-title::before { content: '◈'; color: var(--cyan); }
+#grid-wrap { overflow: auto; }
+#grid { display: inline-grid; gap: 4px; }
+
+/* ═══════════════════ CELLS ═══════════════════ */
+.cell {
+  width: 78px; height: 78px; border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; border: 1px solid; gap: 3px;
+  user-select: none; cursor: default; overflow: hidden;
+  transition: transform .12s, box-shadow .12s;
+}
+.cell:hover { transform: scale(1.06); z-index: 5; }
+.cell::before {
+  content: attr(data-coord);
+  position: absolute; top: 3px; left: 5px;
+  font-family: var(--ff-mono); font-size: 7px; opacity: .35; line-height: 1;
+}
+.cell .icon { font-size: 28px; line-height: 1; }
+.cell .clabel {
+  font-family: var(--ff-head); font-size: 7px; letter-spacing: .06em;
+  text-transform: uppercase; opacity: .9; text-align: center;
+}
+
+/* States */
+.cell.unknown  { background: linear-gradient(145deg,#050810,#030609); border-color: rgba(0,229,255,0.08); color: var(--txt3); }
+.cell.visited  { background: linear-gradient(145deg,#091018,#060c12); border-color: rgba(184,255,0,0.2); color: var(--lime2); }
+.cell.safe     {
+  background: linear-gradient(145deg,#051210,#030c08);
+  border-color: rgba(0,255,204,0.65); color: var(--teal);
+  box-shadow: inset 0 0 16px rgba(0,255,204,0.1), 0 0 14px rgba(0,255,204,0.2);
+  animation: safe-pulse 2.8s ease-in-out infinite;
+}
+@keyframes safe-pulse {
+  0%,100% { box-shadow: inset 0 0 16px rgba(0,255,204,0.1), 0 0 14px rgba(0,255,204,0.2); }
+  50%     { box-shadow: inset 0 0 26px rgba(0,255,204,0.2), 0 0 28px rgba(0,255,204,0.38); }
+}
+.cell.agent    {
+  background: linear-gradient(145deg,#080f20,#050c18);
+  border-color: var(--cyan); color: var(--cyan);
+  box-shadow: 0 0 22px rgba(0,229,255,0.45), inset 0 0 22px rgba(0,229,255,0.12);
+  animation: agent-glow 1.6s ease-in-out infinite;
+}
+@keyframes agent-glow {
+  0%,100% { box-shadow: 0 0 22px rgba(0,229,255,0.4), inset 0 0 20px rgba(0,229,255,0.1); }
+  50%     { box-shadow: 0 0 40px rgba(0,229,255,0.7), inset 0 0 36px rgba(0,229,255,0.22); }
+}
+.cell.breeze   { background: linear-gradient(145deg,#040818,#020510); border-color: rgba(80,100,255,0.45); color: #7090ff; }
+.cell.stench   { background: linear-gradient(145deg,#180604,#100402); border-color: rgba(255,120,40,0.45); color: var(--amber); }
+.cell.both     { background: linear-gradient(145deg,#120618,#0c040f); border-color: rgba(200,80,200,0.5); color: #d070d0; }
+.cell.pit      {
+  background: linear-gradient(145deg,#180004,#0e0002);
+  border-color: var(--red); color: var(--red);
+  box-shadow: inset 0 0 24px rgba(255,34,34,0.3), 0 0 16px rgba(255,34,34,0.22);
+  animation: pit-throb .7s ease-in-out infinite;
+}
+@keyframes pit-throb { 0%,100%{opacity:1} 50%{opacity:.75} }
+.cell.wumpus   {
+  background: linear-gradient(145deg,#1a0604,#100402);
+  border-color: var(--magenta); color: var(--magenta);
+  box-shadow: inset 0 0 24px rgba(255,45,120,0.28), 0 0 18px rgba(255,45,120,0.3);
+  animation: wump-pulse 1s ease-in-out infinite;
+}
+@keyframes wump-pulse {
+  0%,100% { box-shadow: inset 0 0 24px rgba(255,45,120,0.25), 0 0 18px rgba(255,45,120,0.25); }
+  50%     { box-shadow: inset 0 0 42px rgba(255,45,120,0.48), 0 0 36px rgba(255,45,120,0.5); }
+}
+.cell.gold     {
+  background: linear-gradient(145deg,#1a1000,#120b00);
+  border-color: var(--amber); color: var(--amber);
+  box-shadow: inset 0 0 24px rgba(255,179,0,0.28), 0 0 24px rgba(255,179,0,0.4);
+  animation: gold-shine 1.4s ease-in-out infinite;
+}
+@keyframes gold-shine {
+  0%,100% { box-shadow: inset 0 0 24px rgba(255,179,0,0.25), 0 0 24px rgba(255,179,0,0.35); }
+  50%     { box-shadow: inset 0 0 40px rgba(255,179,0,0.48), 0 0 48px rgba(255,179,0,0.6); }
+}
+.cell.win-cell {
+  background: linear-gradient(145deg,#1a1000,#120b00);
+  border-color: var(--amber); color: var(--amber);
+  animation: win-pop .6s ease-in-out infinite;
+}
+@keyframes win-pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+
+/* ═══════════════════ WUMPUS MOVE FLASH ═══════════════════ */
+.wump-flash {
+  position: fixed; inset: 0; z-index: 2000; pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255,45,120,0.15) 0%, transparent 70%);
+  animation: flash-out .7s ease forwards;
+}
+@keyframes flash-out { from{opacity:1} to{opacity:0} }
+
+/* ═══════════════════ SIDEBAR ═══════════════════ */
+.sidebar { display: flex; flex-direction: column; gap: 10px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--bdr); border-radius: 4px;
+  padding: 12px 14px; position: relative; overflow: hidden;
+}
+.panel::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--bdr2), transparent);
+}
+.ptitle {
+  font-family: var(--ff-head); font-size: 8px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--txt2); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.ptitle::before {
+  content: ''; display: inline-block; width: 3px; height: 10px;
+  background: linear-gradient(180deg, var(--cyan), var(--teal2));
+  box-shadow: 0 0 8px rgba(0,229,255,0.6); border-radius: 2px;
+}
+
+/* Metrics */
+.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.mc {
+  background: rgba(4,6,10,0.9); border: 1px solid var(--bdr);
+  border-radius: 3px; padding: 8px 10px; position: relative; overflow: hidden;
+}
+.mc::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; border-radius: 0 0 2px 2px;
+}
+.mc-steps::after   { background: var(--amber);   box-shadow: 0 0 8px var(--amber); }
+.mc-visited::after { background: var(--lime);    box-shadow: 0 0 8px var(--lime); }
+.mc-kb::after      { background: var(--cyan);    box-shadow: 0 0 8px var(--cyan); }
+.mc-safe::after    { background: var(--teal);    box-shadow: 0 0 8px var(--teal); }
+.mc-lbl { font-family: var(--ff-mono); font-size: 7px; color: var(--txt3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.mc-val { font-family: var(--ff-head); font-size: 24px; font-weight: 900; line-height: 1; }
+.mc-steps.mc-val, .mc-steps .mc-val   { color: var(--amber);  text-shadow: 0 0 12px rgba(255,179,0,.5); }
+.mc-visited .mc-val { color: var(--lime);   text-shadow: 0 0 12px rgba(184,255,0,.4); }
+.mc-kb .mc-val      { color: var(--cyan);   text-shadow: 0 0 12px rgba(0,229,255,.4); }
+.mc-safe .mc-val    { color: var(--teal);   text-shadow: 0 0 12px rgba(0,255,204,.4); }
+
+/* Percepts */
+.percept-row { display: flex; gap: 6px; flex-wrap: wrap; min-height: 28px; align-items: center; }
+.pbadge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--ff-head); font-size: 8px; letter-spacing: .08em; text-transform: uppercase;
+  padding: 5px 11px; border-radius: 2px; border: 1px solid;
+  animation: badge-in .2s ease; font-weight: 600;
+}
+@keyframes badge-in { from{opacity:0;transform:scale(.7)} to{opacity:1;transform:scale(1)} }
+.pb-b    { border-color: rgba(80,100,255,.6); color: #7090ff; background: rgba(80,100,255,.1); }
+.pb-s    { border-color: var(--amber2); color: var(--amber); background: var(--amber-g); }
+.pb-g    { border-color: var(--amber); color: var(--amber); background: var(--amber-g); box-shadow: 0 0 12px rgba(255,179,0,.3); }
+.pb-none { font-size: 10px; color: var(--txt3); font-family: var(--ff-mono); }
+
+/* KB */
+.kb-scroll {
+  max-height: 110px; overflow-y: auto; font-size: 9px; line-height: 2;
+  color: var(--txt2); font-family: var(--ff-mono);
+  scrollbar-width: thin; scrollbar-color: var(--bdr) transparent;
+}
+.kb-scroll::-webkit-scrollbar { width: 3px; }
+.kb-scroll::-webkit-scrollbar-thumb { background: var(--bdr2); border-radius: 2px; }
+.kb-row { border-bottom: 1px solid rgba(0,229,255,0.06); padding: 1px 0; }
+.kb-n { color: var(--magenta); }
+.kb-p { color: var(--teal); }
+.kb-o { color: var(--txt3); }
+
+/* Legend */
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.leg { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--txt2); font-family: var(--ff-mono); }
+.ld { width: 12px; height: 12px; border-radius: 2px; border: 1px solid; flex-shrink: 0; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+.ld-unk { background: #050810; border-color: rgba(0,229,255,.1); }
+.ld-vis { background: #091018; border-color: rgba(184,255,0,.25); }
+.ld-saf { background: #051210; border-color: rgba(0,255,204,.65); box-shadow: 0 0 5px rgba(0,255,204,.4); }
+.ld-agt { background: #080f20; border-color: var(--cyan); box-shadow: 0 0 6px rgba(0,229,255,.6); }
+.ld-pit { background: #180004; border-color: var(--red); box-shadow: 0 0 5px rgba(255,34,34,.5); }
+.ld-wmp { background: #1a0604; border-color: var(--magenta); box-shadow: 0 0 5px rgba(255,45,120,.5); }
+.ld-gld { background: #1a1000; border-color: var(--amber); box-shadow: 0 0 5px rgba(255,179,0,.5); }
+.ld-brz { background: #040818; border-color: rgba(80,100,255,.5); }
+
+/* Log */
+.log-area { max-height: 148px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--bdr) transparent; }
+.log-area::-webkit-scrollbar { width: 3px; }
+.log-area::-webkit-scrollbar-thumb { background: var(--bdr2); border-radius: 2px; }
+.log-row {
+  display: grid; grid-template-columns: auto 1fr; gap: 7px;
+  padding: 4px 0; border-bottom: 1px solid rgba(0,229,255,0.05);
+  font-size: 9px; line-height: 1.5; align-items: start; font-family: var(--ff-mono);
+}
+.log-tag {
+  font-family: var(--ff-head); font-size: 7px; letter-spacing: .08em;
+  padding: 1px 6px; border-radius: 2px; border: 1px solid; white-space: nowrap; font-weight: 700;
+}
+.lt-INIT  { color: var(--teal);    border-color: var(--teal2);    background: rgba(0,255,204,.07); }
+.lt-TELL  { color: #7090ff;        border-color: rgba(80,100,255,.4); background: rgba(80,100,255,.07); }
+.lt-ASK   { color: var(--lime);    border-color: var(--lime2);    background: var(--lime-g); }
+.lt-MOVE  { color: var(--lime);    border-color: var(--lime2);    background: var(--lime-g); }
+.lt-RISK  { color: var(--amber);   border-color: var(--amber2);   background: var(--amber-g); }
+.lt-NAV   { color: var(--cyan);    border-color: var(--cyan2);    background: var(--cyan-g); }
+.lt-WMOV  { color: var(--magenta); border-color: var(--mag2);     background: var(--mag-g); }
+.lt-DEATH { color: var(--red);     border-color: var(--red2);     background: var(--red-g); }
+.lt-WIN   { color: var(--amber);   border-color: var(--amber2);   background: var(--amber-g); box-shadow: 0 0 8px rgba(255,179,0,.25); }
+.lt-STUCK { color: var(--txt2);    border-color: var(--bdr2);     background: var(--cyan-g); }
+.log-msg { color: var(--txt2); }
+
+/* ═══════════════════ OVERLAY ═══════════════════ */
+#overlay {
+  display: none; position: fixed; inset: 0; z-index: 3000;
+  background: rgba(2,4,8,0.88); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#overlay.show { display: flex; }
+.ov-box {
+  border: 1px solid; border-radius: 6px;
+  padding: 42px 56px; text-align: center;
+  max-width: 420px; width: 92%; position: relative; overflow: hidden;
+  animation: ov-enter .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes ov-enter { from{transform:scale(.7) translateY(-24px);opacity:0} to{transform:scale(1);opacity:1} }
+.ov-box::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.ov-win  { border-color: var(--amber); background: linear-gradient(160deg,#1a1000,#0e0a00); box-shadow: 0 0 90px rgba(255,179,0,.25); }
+.ov-lose { border-color: var(--red);   background: linear-gradient(160deg,#1a0000,#0e0000); box-shadow: 0 0 90px rgba(255,34,34,.25); }
+.ov-win::before  { background: linear-gradient(90deg,transparent,var(--amber),transparent); }
+.ov-lose::before { background: linear-gradient(90deg,transparent,var(--red),transparent); }
+
+.ov-icon { font-size: 64px; margin-bottom: 12px; line-height: 1; }
+.ov-title {
+  font-family: var(--ff-head); font-size: 24px; font-weight: 900;
+  letter-spacing: .16em; margin-bottom: 6px;
+}
+.ov-win  .ov-title { color: var(--amber); text-shadow: 0 0 28px rgba(255,179,0,.6); }
+.ov-lose .ov-title { color: var(--red);   text-shadow: 0 0 28px rgba(255,34,34,.6); }
+.ov-sub { font-family: var(--ff-mono); font-size: 11px; color: var(--txt2); margin-bottom: 22px; font-style: italic; line-height: 1.6; }
+
+.ov-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+.ov-s { background: rgba(0,0,0,.4); border: 1px solid var(--bdr); border-radius: 3px; padding: 8px 10px; }
+.ov-sl { font-family: var(--ff-mono); font-size: 7px; color: var(--txt3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+.ov-sv { font-family: var(--ff-head); font-size: 20px; font-weight: 900; }
+.ov-win  .ov-sv { color: var(--amber); }
+.ov-lose .ov-sv { color: var(--magenta); }
+
+.ov-btn {
+  font-family: var(--ff-head); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  padding: 12px 36px; border-radius: 3px; border: 1px solid var(--cyan2);
+  color: var(--cyan); background: rgba(0,229,255,0.08);
+  cursor: pointer; transition: all .18s; text-transform: uppercase;
+}
+.ov-btn:hover { background: rgba(0,229,255,0.18); box-shadow: 0 0 20px rgba(0,229,255,.4); border-color: var(--cyan); }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-glyph">🧭</div>
+      <div class="hdr-text">
+        <h1>WUMPUS WORLD</h1>
+        <div class="sub">Propositional Logic · Resolution Refutation · Dynamic Pathfinding</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span class="pill pill-online">● ONLINE</span>
+      <span class="pill pill-wump" id="wumpus-badge">⚠ WUMPUS ACTIVE</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="ctrl">
+    <span class="ctrl-lbl">Config</span>
+    <div class="ctrl-grp"><label>Rows</label><input type="number" id="in-rows" value="4" min="3" max="8"></div>
+    <div class="ctrl-grp"><label>Cols</label><input type="number" id="in-cols" value="4" min="3" max="8"></div>
+    <div class="ctrl-grp"><label>Pits</label><input type="number" id="in-pits" value="3" min="1" max="6"></div>
+    <div class="vdiv"></div>
+    <button class="btn btn-new"  onclick="initGame()">⬡ NEW EPISODE</button>
+    <button class="btn btn-step" onclick="agentStep()">▶ STEP</button>
+    <button class="btn btn-auto" id="auto-btn" onclick="toggleAuto()">⏩ AUTO RUN</button>
+  </div>
+
+  <!-- STATUS -->
+  <div id="status-bar">
+    <span class="status-cursor">▌</span>
+    <span id="status-text">Initialise a new episode to begin exploration.</span>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- Map -->
+    <div class="map-panel">
+      <div class="map-title">Cave Map — Coordinates (row, col) · Agent spawns at (0,0)</div>
+      <div id="grid-wrap"><div id="grid"></div></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <div class="panel">
+        <div class="ptitle">Real-Time Metrics</div>
+        <div class="metric-grid">
+          <div class="mc mc-steps"> <div class="mc-lbl">Inference Steps</div><div class="mc-val" id="m-steps">0</div></div>
+          <div class="mc mc-visited"><div class="mc-lbl">Cells Visited</div> <div class="mc-val" id="m-visited">0</div></div>
+          <div class="mc mc-kb">    <div class="mc-lbl">KB Clauses</div>    <div class="mc-val" id="m-kb">0</div></div>
+          <div class="mc mc-safe">  <div class="mc-lbl">Safe Proven</div>   <div class="mc-val" id="m-safe">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ptitle">Active Percepts</div>
+        <div class="percept-row" id="percepts-display"><span class="pb-none">— none detected —</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="ptitle">Knowledge Base · CNF</div>
+        <div class="kb-scroll" id="kb-display"><span style="font-size:9px;color:var(--txt3)">— empty —</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="ptitle">Legend</div>
+        <div class="legend-grid">
+          <div class="leg"><div class="ld ld-unk">?</div>Unknown</div>
+          <div class="leg"><div class="ld ld-saf">✓</div>Safe</div>
+          <div class="leg"><div class="ld ld-vis">·</div>Visited</div>
+          <div class="leg"><div class="ld ld-agt">@</div>Agent</div>
+          <div class="leg"><div class="ld ld-pit">○</div>Pit</div>
+          <div class="leg"><div class="ld ld-wmp">!</div>Wumpus</div>
+          <div class="leg"><div class="ld ld-gld">★</div>Gold</div>
+          <div class="leg"><div class="ld ld-brz">~</div>Breeze</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ptitle">Agent Log</div>
+        <div class="log-area" id="log"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="ov-box" id="ov-box">
+    <div class="ov-icon" id="ov-icon"></div>
+    <div class="ov-title" id="ov-title"></div>
+    <div class="ov-sub" id="ov-sub"></div>
+    <div class="ov-stats" id="ov-stats"></div>
+    <button class="ov-btn" onclick="closeOverlay()">▶ PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+/* ────────────────────────────────────────
+   CELL ICONS — emoji-based, vivid
+──────────────────────────────────────── */
+const ICON = {
+  agent:   '🤖',
+  wumpus:  '👹',
+  pit:     '🕳️',
+  gold:    '💎',
+  safe:    '✅',
+  visited: '🔵',
+  unknown: '❓',
+  breeze:  '🌀',
+  stench:  '☠️',
+  both:    '⚡',
+  skull:   '💀',
+  trophy:  '🏆',
+  dead:    '💀',
+  win:     '🏆',
+};
+
+/* ────────────────────────────────────────
+   GAME STATE
+──────────────────────────────────────── */
+let R, C, NPITS;
+let grid, agentPos, visited, safeCells, KB;
+let wumpusPos, wumpusAlive, goldCollected;
+let inferenceSteps, gameOver, autoTimer;
+
+const rc  = (r,c) => `${r}_${c}`;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function neighbors(r, c) {
+  return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([nr,nc]) => nr>=0 && nr<R && nc>=0 && nc<C);
+}
+function shuffle(a) {
+  for (let i=a.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+/* ────────────────────────────────────────
+   INIT
+──────────────────────────────────────── */
+function initGame() {
+  clearInterval(autoTimer); autoTimer = null;
+  const ab = document.getElementById('auto-btn');
+  ab.textContent = '⏩ AUTO RUN'; ab.classList.remove('running');
+  document.getElementById('overlay').classList.remove('show');
+
+  R = Math.min(8, Math.max(3, +document.getElementById('in-rows').value));
+  C = Math.min(8, Math.max(3, +document.getElementById('in-cols').value));
+  NPITS = Math.min(6, Math.max(1, +document.getElementById('in-pits').value));
+
+  grid=[]; visited=new Set(); safeCells=new Set(); KB=[];
+  inferenceSteps=0; gameOver=false; wumpusAlive=true; goldCollected=false;
+
+  for (let i=0;i<R;i++) { grid.push([]); for (let j=0;j<C;j++) grid[i].push({hasPit:false,hasWumpus:false,hasGold:false}); }
+
+  let places = [];
+  for (let i=0;i<R;i++) for (let j=0;j<C;j++) if (!(i===0&&j===0)) places.push([i,j]);
+  shuffle(places);
+
+  const maxPits = Math.min(NPITS, places.length-2);
+  for (let k=0;k<maxPits;k++) { const [r,c]=places[k]; grid[r][c].hasPit=true; }
+  const [wr,wc]=places[maxPits]; grid[wr][wc].hasWumpus=true; wumpusPos=[wr,wc];
+  const [gr,gc]=places[maxPits+1]; grid[gr][gc].hasGold=true;
+
+  agentPos=[0,0]; safeCells.add(rc(0,0)); visited.add(rc(0,0));
+  tellKB(0,0); runGlobalInference();
+
+  document.getElementById('log').innerHTML='';
+  document.getElementById('wumpus-badge').textContent='⚠ WUMPUS ACTIVE';
+  addLog('INIT',`Episode: ${R}×${C} · ${maxPits} pits · Wumpus roaming · Gold hidden`);
+  renderGrid(); updateMetrics(); updatePercepts(0,0);
+  setStatus(`Agent at (0,0). Cave mapped. ${KB.length} initial clauses loaded.`);
+}
+
+/* ────────────────────────────────────────
+   PERCEPTS
+──────────────────────────────────────── */
+function getPercepts(r, c) {
+  let breeze=false, stench=false, glitter=false;
+  for (const [nr,nc] of neighbors(r,c)) {
+    if (grid[nr][nc].hasPit)                  breeze=true;
+    if (grid[nr][nc].hasWumpus&&wumpusAlive)  stench=true;
+  }
+  if (grid[r][c].hasGold) glitter=true;
+  return {breeze,stench,glitter};
+}
+
+/* ────────────────────────────────────────
+   TELL KB
+──────────────────────────────────────── */
+function tellKB(r, c) {
+  const {breeze, stench} = getPercepts(r,c);
+  const nbrs = neighbors(r,c);
+  if (!breeze) {
+    for (const [nr,nc] of nbrs) { addClause([{v:`P_${nr}_${nc}`,n:true}]); addClause([{v:`W_${nr}_${nc}`,n:true}]); }
+    addClause([{v:`P_${r}_${c}`,n:true}]); addClause([{v:`W_${r}_${c}`,n:true}]);
+    addLog('TELL',`¬Breeze@(${r},${c}) → ¬Pit for all ${nbrs.length} neighbors`);
+  } else {
+    const or = nbrs.map(([nr,nc]) => ({v:`P_${nr}_${nc}`,n:false}));
+    if (or.length) addClause(or);
+    addLog('TELL',`Breeze@(${r},${c}) → ${or.map(l=>l.v).join(' ∨ ')}`);
+  }
+  if (!stench) {
+    for (const [nr,nc] of nbrs) addClause([{v:`W_${nr}_${nc}`,n:true}]);
+    addClause([{v:`W_${r}_${c}`,n:true}]);
+  } else {
+    const or = nbrs.map(([nr,nc]) => ({v:`W_${nr}_${nc}`,n:false}));
+    if (or.length) addClause(or);
+    addLog('TELL',`Stench@(${r},${c}) → ${or.map(l=>l.v).join(' ∨ ')}`);
+  }
+  addClause([{v:`SAFE_${r}_${c}`,n:false}]);
+}
+function addClause(lits) {
+  const key = lits.map(l=>(l.n?'¬':'')+l.v).sort().join('∨');
+  if (!KB.find(c=>c.key===key)) KB.push({key,lits});
+}
+
+/* ────────────────────────────────────────
+   RESOLUTION REFUTATION
+──────────────────────────────────────── */
+function askKB(varName) {
+  inferenceSteps++;
+  const clauseSet = new Set(KB.map(c=>clauseKey(c.lits)));
+  let working = [...KB.map(c=>[...c.lits]), [{v:varName,n:false}]];
+  clauseSet.add(clauseKey([{v:varName,n:false}]));
+  for (let round=0; round<600; round++) {
+    const newC=[]; let progress=false;
+    for (let i=0; i<working.length&&!progress; i++) {
+      for (let j=i+1; j<working.length&&!progress; j++) {
+        for (const res of resolveTwo(working[i],working[j])) {
+          if (res.length===0) return true;
+          const k = clauseKey(res);
+          if (!clauseSet.has(k)) { newC.push(res); clauseSet.add(k); progress=true; }
+        }
+      }
+    }
+    if (!newC.length) break;
+    working = [...working,...newC];
+    if (working.length>800) break;
+  }
+  return false;
+}
+function resolveTwo(c1, c2) {
+  const out=[];
+  for (const l1 of c1) for (const l2 of c2) {
+    if (l1.v===l2.v && l1.n!==l2.n) out.push(dedupLits([...c1.filter(l=>l!==l1),...c2.filter(l=>l!==l2)]));
+  }
+  return out;
+}
+function dedupLits(lits) {
+  const seen=new Set();
+  return lits.filter(l=>{const k=(l.n?'¬':'')+l.v; if(seen.has(k)) return false; seen.add(k); return true;});
+}
+function clauseKey(lits) { return lits.map(l=>(l.n?'¬':'')+l.v).sort().join('|'); }
+function runGlobalInference() {
+  let n=0;
+  for (let i=0;i<R;i++) for (let j=0;j<C;j++) {
+    if (!visited.has(rc(i,j))&&!safeCells.has(rc(i,j))) {
+      if (askKB(`P_${i}_${j}`)&&askKB(`W_${i}_${j}`)) {
+        safeCells.add(rc(i,j)); n++;
+        addLog('ASK',`Proved ¬P ∧ ¬W at (${i},${j}) → SAFE`);
+      }
+    }
+  }
+  return n;
+}
+
+/* ────────────────────────────────────────
+   WUMPUS MOVEMENT — ALL 4 DIRECTIONS
+  The Wumpus now picks a random valid neighbor
+  each turn (up/down/left/right equally likely).
+──────────────────────────────────────── */
+function moveWumpus() {
+  if (!wumpusAlive) return;
+  const [wr,wc] = wumpusPos;
+
+  // All 4 neighbours within grid that aren't pits
+  const candidates = neighbors(wr,wc).filter(([r,c]) => !grid[r][c].hasPit);
+
+  // Also allow staying put occasionally (30% chance) so it doesn't always flee
+  // But always move if there's a valid direction
+  if (candidates.length === 0) return; // Boxed in by pits — stays
+
+  // Pick uniformly at random from all valid moves
+  const [nr,nc] = candidates[Math.floor(Math.random() * candidates.length)];
+
+  // Update grid
+  grid[wr][wc].hasWumpus = false;
+  grid[nr][nc].hasWumpus = true;
+  wumpusPos = [nr,nc];
+
+  addLog('WMOV', `Wumpus: (${wr},${wc}) → (${nr},${nc})`);
+
+  // Screen flash
+  const f = document.createElement('div');
+  f.className = 'wump-flash';
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 750);
+}
+
+/* ────────────────────────────────────────
+   AGENT STEP
+──────────────────────────────────────── */
+function agentStep() {
+  if (gameOver) return;
+
+  // Wumpus moves EVERY step in a random direction
+  moveWumpus();
+
+  const [ar,ac] = agentPos;
+
+  // Wumpus may have walked onto agent
+  if (wumpusAlive && grid[ar][ac].hasWumpus) {
+    renderGrid();
+    showOverlay(false, `The Wumpus crept into your chamber at (${ar},${ac})!`);
+    addLog('DEATH', `Wumpus entered agent cell (${ar},${ac})!`);
+    endGame(); return;
+  }
+
+  const nbrs = neighbors(ar,ac);
+  const safeNext = nbrs.filter(([r,c]) => safeCells.has(rc(r,c)) && !visited.has(rc(r,c)));
+  let target = null;
+
+  if (safeNext.length > 0) {
+    target = safeNext[0];
+    addLog('MOVE', `Safe move → (${target[0]},${target[1]})`);
+  } else {
+    const anyNext = nbrs.filter(([r,c]) => !visited.has(rc(r,c)));
+    if (anyNext.length > 0) {
+      target = anyNext[0];
+      addLog('RISK', `Risk move → (${target[0]},${target[1]})`);
+    } else {
+      const gs = [...safeCells].filter(k=>!visited.has(k)).map(k=>k.split('_').map(Number));
+      if (gs.length > 0) {
+        const path = bfs(ar,ac,gs[0][0],gs[0][1]);
+        if (path && path.length > 1) { target=[path[1][0],path[1][1]]; addLog('NAV',`Backtracking → (${gs[0][0]},${gs[0][1]})`); }
+      }
+      if (!target) {
+        addLog('STUCK','No reachable safe cells.');
+        setStatus('⚠ Agent stuck — no safe moves available.');
+        return;
+      }
+    }
+  }
+  moveAgent(target[0], target[1]);
+}
+
+function moveAgent(r, c) {
+  agentPos = [r,c]; visited.add(rc(r,c));
+  const cell = grid[r][c];
+
+  if (cell.hasPit) {
+    renderGrid();
+    showOverlay(false, `Agent fell into a pit at (${r},${c}) and perished in darkness.`);
+    addLog('DEATH', `Fell into pit at (${r},${c}).`);
+    endGame(); return;
+  }
+  if (cell.hasWumpus && wumpusAlive) {
+    renderGrid();
+    showOverlay(false, `The Wumpus devoured the agent at (${r},${c})!`);
+    addLog('DEATH', `Eaten by Wumpus at (${r},${c}).`);
+    endGame(); return;
+  }
+  if (cell.hasGold) {
+    goldCollected=true; cell.hasGold=false;
+    renderGrid();
+    showOverlay(true, `Agent recovered the gold at (${r},${c}) and escaped the cave!`);
+    addLog('WIN', `Gold secured at (${r},${c})! Mission complete!`);
+    endGame(); return;
+  }
+
+  tellKB(r,c);
+  const newSafe = runGlobalInference();
+  renderGrid(); updateMetrics(); updatePercepts(r,c);
+  setStatus(`Agent at (${r},${c}) · KB: ${KB.length} clauses · Steps: ${inferenceSteps} · +${newSafe} safe`);
+}
+
+function endGame() {
+  gameOver=true; clearInterval(autoTimer); autoTimer=null;
+  const ab = document.getElementById('auto-btn');
+  ab.textContent='⏩ AUTO RUN'; ab.classList.remove('running');
+  updateMetrics();
+}
+
+/* ────────────────────────────────────────
+   BFS
+──────────────────────────────────────── */
+function bfs(sr,sc,er,ec) {
+  const q=[[sr,sc,[]]], seen=new Set([rc(sr,sc)]);
+  while (q.length) {
+    const [r,c,path] = q.shift();
+    if (r===er && c===ec) return [...path,[r,c]];
+    for (const [nr,nc] of neighbors(r,c)) {
+      if (!seen.has(rc(nr,nc)) && (safeCells.has(rc(nr,nc))||visited.has(rc(nr,nc)))) {
+        seen.add(rc(nr,nc)); q.push([nr,nc,[...path,[r,c]]]);
+      }
+    }
+  }
+  return null;
+}
+
+function toggleAuto() {
+  if (autoTimer) {
+    clearInterval(autoTimer); autoTimer=null;
+    const ab=document.getElementById('auto-btn');
+    ab.textContent='⏩ AUTO RUN'; ab.classList.remove('running'); return;
+  }
+  const ab=document.getElementById('auto-btn');
+  ab.textContent='⏹ STOP'; ab.classList.add('running');
+  autoTimer = setInterval(() => {
+    if (gameOver) { clearInterval(autoTimer); autoTimer=null; ab.textContent='⏩ AUTO RUN'; ab.classList.remove('running'); return; }
+    agentStep();
+  }, 600);
+}
+
+/* ────────────────────────────────────────
+   RENDER
+──────────────────────────────────────── */
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.style.gridTemplateColumns = `repeat(${C},78px)`;
+  g.innerHTML = '';
+
+  for (let i=R-1; i>=0; i--) {
+    for (let j=0; j<C; j++) {
+      const div = document.createElement('div');
+      div.className = 'cell';
+      div.setAttribute('data-coord', `${i},${j}`);
+      const [ar,ac] = agentPos;
+      const isAgent  = ar===i && ac===j;
+      const isVis    = visited.has(rc(i,j));
+      const isSafe   = safeCells.has(rc(i,j));
+      const cell     = grid[i][j];
+      let icon='', clabel='';
+
+      if (isAgent) {
+        div.classList.add('agent'); icon=ICON.agent; clabel='AGENT';
+        const {breeze,stench} = getPercepts(i,j);
+        if (breeze&&stench)  { icon=ICON.both;    clabel='BOTH!'; }
+        else if (breeze)     { icon=ICON.breeze;  clabel='BREEZE!'; }
+        else if (stench)     { icon=ICON.stench;  clabel='STENCH!'; }
+      } else if (isVis) {
+        const {breeze,stench,glitter} = getPercepts(i,j);
+        if (glitter)         { div.classList.add('gold');    icon=ICON.gold;    clabel='GLITTER'; }
+        else if (breeze&&stench) { div.classList.add('both'); icon=ICON.both;  clabel='BOTH'; }
+        else if (breeze)     { div.classList.add('breeze');  icon=ICON.breeze;  clabel='BREEZE'; }
+        else if (stench)     { div.classList.add('stench');  icon=ICON.stench;  clabel='STENCH'; }
+        else                 { div.classList.add('visited'); icon=ICON.visited; clabel='CLEAR'; }
+      } else if (isSafe) {
+        div.classList.add('safe'); icon=ICON.safe; clabel='SAFE';
+      } else {
+        div.classList.add('unknown'); icon=ICON.unknown; clabel='UNKNOWN';
+      }
+
+      // Game-over reveal
+      if (gameOver) {
+        if (cell.hasPit)               { div.className='cell pit';    icon=ICON.pit;    clabel='PIT'; }
+        if (cell.hasWumpus)            { div.className='cell wumpus'; icon=ICON.wumpus; clabel='WUMPUS'; }
+        if (cell.hasGold&&!isAgent)    { div.className='cell gold';   icon=ICON.gold;   clabel='GOLD'; }
+        if (isAgent) {
+          if (cell.hasPit||cell.hasWumpus) { div.className='cell pit'; icon=ICON.skull; clabel='DEAD'; }
+          else if (goldCollected)          { div.className='cell win-cell'; icon=ICON.trophy; clabel='WIN!'; }
+          else                             { div.className='cell agent'; icon=ICON.agent; clabel='AGENT'; }
+        }
+      }
+
+      div.innerHTML = `<div class="icon">${icon}</div><span class="clabel">${esc(clabel)}</span>`;
+      g.appendChild(div);
+    }
+  }
+}
+
+/* ────────────────────────────────────────
+   UI HELPERS
+──────────────────────────────────────── */
+function updateMetrics() {
+  document.getElementById('m-steps').textContent   = inferenceSteps;
+  document.getElementById('m-visited').textContent = visited.size;
+  document.getElementById('m-kb').textContent      = KB.length;
+  document.getElementById('m-safe').textContent    = safeCells.size;
+
+  const kbHtml = KB.slice(-20).map(c=>{
+    const parts = c.key.split('∨').map(tok=>{
+      const neg = tok.startsWith('¬');
+      return `<span class="${neg?'kb-n':'kb-p'}">${esc(tok)}</span>`;
+    });
+    return `<div class="kb-row">${parts.join('<span class="kb-o"> ∨ </span>')}</div>`;
+  }).join('');
+  document.getElementById('kb-display').innerHTML = kbHtml || '<span style="font-size:9px;color:var(--txt3)">— empty —</span>';
+}
+
+function updatePercepts(r, c) {
+  const {breeze,stench,glitter} = getPercepts(r,c);
+  let html='';
+  if (breeze)  html+=`<span class="pbadge pb-b">🌀 Breeze</span>`;
+  if (stench)  html+=`<span class="pbadge pb-s">☠️ Stench</span>`;
+  if (glitter) html+=`<span class="pbadge pb-g">💎 Glitter</span>`;
+  if (!html)   html=`<span class="pb-none">— none detected —</span>`;
+  document.getElementById('percepts-display').innerHTML = html;
+}
+
+function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
+
+function addLog(tag, msg) {
+  const div = document.createElement('div');
+  div.className='log-row';
+  div.innerHTML=`<span class="log-tag lt-${esc(tag)}">${esc(tag)}</span><span class="log-msg">${esc(msg)}</span>`;
+  const log = document.getElementById('log');
+  log.insertBefore(div, log.firstChild);
+  while (log.children.length > 80) log.removeChild(log.lastChild);
+}
+
+function showOverlay(win, message) {
+  const box = document.getElementById('ov-box');
+  box.className = 'ov-box ' + (win?'ov-win':'ov-lose');
+  document.getElementById('ov-icon').textContent  = win ? '🏆' : '💀';
+  document.getElementById('ov-title').textContent = win ? 'VICTORY!' : 'DEFEATED';
+  document.getElementById('ov-sub').textContent   = message;
+  document.getElementById('ov-stats').innerHTML =
+    `<div class="ov-s"><div class="ov-sl">Inference Steps</div><div class="ov-sv">${inferenceSteps}</div></div>`+
+    `<div class="ov-s"><div class="ov-sl">Cells Visited</div><div class="ov-sv">${visited.size}</div></div>`+
+    `<div class="ov-s"><div class="ov-sl">KB Clauses</div><div class="ov-sv">${KB.length}</div></div>`+
+    `<div class="ov-s"><div class="ov-sl">Safe Proven</div><div class="ov-sv">${safeCells.size}</div></div>`;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+  initGame();
+}
+
+// Boot
+initGame();
+</script>
+</body>
+</html>
